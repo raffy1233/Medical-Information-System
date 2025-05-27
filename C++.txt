@@ -1,0 +1,273 @@
+#include <iostream>
+#include <fstream>
+#include <sstream>
+#include <vector>
+#include <string>
+#include <unordered_map>
+#include <iomanip>
+#include <algorithm>
+
+using namespace std;
+
+unordered_map<string, string> userDB = {
+    {"RaffyTheExplorer", "iLoveDrugs"},
+    {"doctorStrange", "christine==gay"}
+};
+
+struct Patient {
+    string id;
+    string name;
+    int age;
+    string address;
+    string allergies;
+    string conditions;
+};
+
+int patientCounter = 0;
+
+// Function declarations
+bool authenticate();
+int extractNumericID(const string& id);
+string generatePatientID();
+vector<string> split(const string& s, char delimiter);
+vector<Patient> loadPatients(const string& filename);
+void savePatients(const vector<Patient>& patients, const string& filename);
+Patient* findPatientByID(vector<Patient>& patients, const string& id);
+void viewPatientByID(vector<Patient>& patients);
+void editPatient(vector<Patient>& patients);
+void deletePatient(vector<Patient>& patients);
+void sortAndDisplayPatients(vector<Patient>& patients);
+
+int main() {
+    const string filename = "patients.txt";
+    cout << "=== Medical Record System ===\n";
+
+    if (!authenticate()) {
+        cout << "Authentication failed. Exiting.\n";
+        return 1;
+    }
+
+    vector<Patient> patients = loadPatients(filename);
+
+    int choice;
+    do {
+        cout << "\n1. View Patient by ID"
+             << "\n2. Edit / Add Patient"
+             << "\n3. Delete Patient"
+             << "\n4. View All Patients (Sorted)"
+             << "\n0. Exit"
+             << "\nEnter choice: ";
+        cin >> choice;
+
+        switch (choice) {
+            case 1:
+                viewPatientByID(patients);
+                break;
+            case 2:
+                editPatient(patients);
+                savePatients(patients, filename);
+                cout << "\u2705 Patient record saved.\n";
+                break;
+            case 3:
+                deletePatient(patients);
+                savePatients(patients, filename);
+                break;
+            case 4:
+                sortAndDisplayPatients(patients);
+                break;
+            case 0:
+                cout << "Goodbye.\n";
+                break;
+            default:
+                cout << "Invalid option.\n";
+        }
+    } while (choice != 0);
+
+    return 0;
+}
+
+// Authentication
+bool authenticate() {
+    string username, password;
+    cout << "Username: ";
+    cin >> username;
+    cout << "Password: ";
+    cin >> password;
+
+    auto it = userDB.find(username);
+    return it != userDB.end() && it->second == password;
+}
+
+// Utility: Extract numeric ID
+int extractNumericID(const string& id) {
+    return stoi(id.substr(1));
+}
+
+// Generate next patient ID
+string generatePatientID() {
+    patientCounter++;
+    ostringstream ss;
+    ss << "P" << setw(3) << setfill('0') << patientCounter;
+    return ss.str();
+}
+
+// Utility: Split string
+vector<string> split(const string& s, char delimiter) {
+    vector<string> tokens;
+    string token;
+    istringstream tokenStream(s);
+    while (getline(tokenStream, token, delimiter)) {
+        tokens.push_back(token);
+    }
+    return tokens;
+}
+
+// Load patients from file
+vector<Patient> loadPatients(const string& filename) {
+    ifstream file(filename);
+    vector<Patient> patients;
+    string line;
+    int maxID = 0;
+
+    while (getline(file, line)) {
+        vector<string> fields = split(line, '|');
+        if (fields.size() == 6) {
+            Patient p;
+            p.id = fields[0];
+            p.name = fields[1];
+            p.age = stoi(fields[2]);
+            p.address = fields[3];
+            p.allergies = fields[4];
+            p.conditions = fields[5];
+            patients.push_back(p);
+            int currentID = extractNumericID(p.id);
+            maxID = max(maxID, currentID);
+        }
+    }
+
+    patientCounter = maxID;
+    return patients;
+}
+
+// Save patients to file
+void savePatients(const vector<Patient>& patients, const string& filename) {
+    ofstream file(filename);
+    for (const auto& p : patients) {
+        file << p.id << "|" << p.name << "|" << p.age << "|" << p.address << "|"
+             << p.allergies << "|" << p.conditions << "\n";
+    }
+}
+
+// Find a patient by ID
+Patient* findPatientByID(vector<Patient>& patients, const string& id) {
+    for (auto& p : patients) {
+        if (p.id == id) return &p;
+    }
+    return nullptr;
+}
+
+// View a patient by ID
+void viewPatientByID(vector<Patient>& patients) {
+    string id;
+    cout << "Enter Patient ID (e.g., P001): ";
+    cin >> id;
+    Patient* p = findPatientByID(patients, id);
+    if (p) {
+        cout << "\n--- Patient Record ---\n";
+        cout << "Patient ID      : " << p->id << endl;
+        cout << "Name            : " << p->name << endl;
+        cout << "Age             : " << p->age << endl;
+        cout << "Address         : " << p->address << endl;
+        cout << "Allergies       : " << p->allergies << endl;
+        cout << "Medical History : " << p->conditions << endl;
+        cout << "-----------------------\n";
+    } else {
+        cout << "\u274C No patient found with ID " << id << endl;
+    }
+}
+
+// Edit or add a patient
+void editPatient(vector<Patient>& patients) {
+    string name;
+    cout << "Enter patient name to edit or add: ";
+    cin.ignore();
+    getline(cin, name);
+
+    for (auto& p : patients) {
+        if (p.name == name) {
+            cout << "Editing existing patient...\n";
+            cout << "Enter age: ";
+            cin >> p.age;
+            cin.ignore();
+            cout << "Enter address: ";
+            getline(cin, p.address);
+            cout << "Enter allergies: ";
+            getline(cin, p.allergies);
+            cout << "Enter conditions: ";
+            getline(cin, p.conditions);
+            return;
+        }
+    }
+
+    // Add new patient
+    Patient newP;
+    newP.id = generatePatientID();
+    newP.name = name;
+    cout << "New patient detected. Please provide details:\n";
+    cout << "Enter age: ";
+    cin >> newP.age;
+    cin.ignore();
+    cout << "Enter address: ";
+    getline(cin, newP.address);
+    cout << "Enter allergies: ";
+    getline(cin, newP.allergies);
+    cout << "Enter conditions: ";
+    getline(cin, newP.conditions);
+    patients.push_back(newP);
+}
+
+// Delete a patient
+void deletePatient(vector<Patient>& patients) {
+    string id;
+    cout << "Enter Patient ID to delete: ";
+    cin >> id;
+
+    auto it = remove_if(patients.begin(), patients.end(), [&](const Patient& p) {
+        return p.id == id;
+    });
+
+    if (it != patients.end()) {
+        patients.erase(it, patients.end());
+        cout << "\u2705 Patient deleted.\n";
+    } else {
+        cout << "\u274C No patient found with ID " << id << endl;
+    }
+}
+
+// Sort and display patients
+void sortAndDisplayPatients(vector<Patient>& patients) {
+    int sortChoice;
+    cout << "\nSort by:\n1. Name\n2. Age\nEnter choice: ";
+    cin >> sortChoice;
+
+    if (sortChoice == 1) {
+        sort(patients.begin(), patients.end(), [](const Patient& a, const Patient& b) {
+            return a.name < b.name;
+        });
+    } else if (sortChoice == 2) {
+        sort(patients.begin(), patients.end(), [](const Patient& a, const Patient& b) {
+            return a.age < b.age;
+        });
+    } else {
+        cout << "Invalid sort choice.\n";
+        return;
+    }
+
+    cout << "\n=== Sorted Patient List ===\n";
+    for (const auto& p : patients) {
+        cout << p.id << " | " << p.name << " | Age: " << p.age << " | "
+             << p.address << " | " << p.allergies << " | " << p.conditions << "\n";
+    }
+    cout << "===========================\n";
+}
+r
